@@ -1,0 +1,19 @@
+ytd-watch-flexy #movie_player.ad-showing > .html5-video-container { visibility: hidden !important; }
+#movie_player[data-focus-player-ad] > :not(.focus-player-ad-notice) {
+  opacity: 0 !important;
+}
+#movie_player[data-focus-player-ad] {
+  background: #101010 !important;
+}
+#movie_player[data-focus-player-ad] .focus-player-ad-notice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  color: #f3f5f6;
+  background: #101010;
+  font: 15px system-ui, sans-serif;
+  z-index: 1000;
+  pointer-events: none;
+}

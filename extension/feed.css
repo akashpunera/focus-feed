@@ -1,0 +1,24 @@
+[data-focus-feed-hidden] { display: none !important; }
+.focus-feed-votes {
+  display: flex; position: relative; z-index: 1; flex-wrap: wrap; align-items: center;
+  gap: 6px; padding: 5px 8px; margin: 3px 0; font: 12px system-ui, sans-serif;
+}
+.focus-feed-votes button, #focus-feed-dialog button {
+  border: 1px solid #78828b; border-radius: 6px; background: transparent; color: inherit;
+  padding: 3px 8px; cursor: pointer; min-height: 25px; font: inherit;
+}
+.focus-feed-votes button[aria-pressed="true"] { background: #246458; color: white; }
+#focus-feed-dialog {
+  color-scheme: light dark; color: CanvasText; background: Canvas;
+  border: 1px solid #78828b; border-radius: 12px; width: min(380px, 86vw);
+  padding: 18px; font: 15px system-ui, sans-serif;
+}
+#focus-feed-dialog::backdrop { background: #0007; }
+#focus-feed-dialog h2 { font-size: 18px; margin: 0 0 14px; }
+#focus-feed-dialog select, #focus-feed-dialog textarea {
+  box-sizing: border-box; display: block; width: 100%; margin-bottom: 10px; font: inherit;
+}
+#focus-feed-dialog textarea { min-height: 72px; padding: 7px; }
+#focus-feed-dialog button { margin-right: 8px; padding: 6px 10px; }
+
+.focus-feed-votes > span { color: #f3f5f6; background: #30383e; border-radius: 5px; padding: 3px 6px; }

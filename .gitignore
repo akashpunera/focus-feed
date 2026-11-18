@@ -1,0 +1,11 @@
+.DS_Store
+._*
+/.module-cache/
+/.pnpm-store/
+/build/
+/node_modules/
+*.app/
+*.appex/
+*.zip
+*.log
+.env*

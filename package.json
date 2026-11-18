@@ -1,0 +1,6 @@
+{
+  "name": "focus-feed",
+  "private": true,
+  "scripts": { "test": "node --test tests/feed.test.cjs" },
+  "devDependencies": { "jsdom": "26.1.0" }
+}

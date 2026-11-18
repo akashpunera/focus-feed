@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Focus Feed</title>
+<link rel="stylesheet" href="settings.css">
+<script defer src="policy.js"></script>
+<script defer src="settings.js"></script>
+</head>
+<body>
+<main>
+<h1>Focus Feed</h1>
+<p>Use 👍 and 👎 on X and YouTube Home to teach your feed.</p>
+<label for="discovery">Discovery</label>
+<select id="discovery">
+<option value="5">Low · 5%</option>
+<option value="15" selected>Balanced · 15%</option>
+<option value="30">High · 30%</option>
+</select>
+<label><input type="checkbox" id="focus"> Prioritize posts like my likes</label>
+<label><input type="checkbox" id="review"> Review posts hidden by my preferences</label>
+<p id="status" role="status"></p>
+<h2>Saved preferences</h2>
+<div id="saved"></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,15 @@
+:root { color-scheme: light dark; font: 14px system-ui, sans-serif; }
+html { width: 350px; background: Canvas; color: CanvasText; }
+body { width: 350px; margin: 0; }
+main { padding: 15px 17px; }
+h1 { font-size: 23px; margin: 0; }
+h2 { font-size: 16px; }
+p { line-height: 1.4; }
+label { display: block; margin: 9px 0 4px; }
+select, textarea, button { font: inherit; }
+textarea { box-sizing: border-box; width: 100%; margin-top: 7px; }
+button { margin: 4px 5px 0 0; padding: 4px 7px; cursor: pointer; }
+article { border-top: 1px solid #84848466; padding: 8px 0; overflow-wrap: anywhere; }
+article strong { display: block; }
+summary { cursor: pointer; margin-top: 14px; }
+#status { margin: 0; }
