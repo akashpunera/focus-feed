@@ -52,10 +52,35 @@
     return "example";
   }
 
-  function vote(card, direction, reason, note) {
-    const text = card.text.slice(0, 1600);
-    return { id: card.id, url: card.url, text, direction, reason,
-      note: note.trim().slice(0, 400), features: features(text), words: words(text), savedAt: Date.now() };
+  const pendingKey = "pendingVote";
+  const draftLifetime = 10 * 60 * 1000;
+
+  function canonicalUrl(id) {
+    if (typeof id !== "string") return "";
+    const youtube = /^youtube:([\w-]{1,32})$/.exec(id);
+    if (youtube) return "https://www.youtube.com/watch?v=" + youtube[1];
+    const x = /^x:(\d{1,24})$/.exec(id);
+    return x ? "https://x.com/i/status/" + x[1] : "";
+  }
+
+  function vote(card, direction, reason, note, savedAt = Date.now()) {
+    const url = canonicalUrl(card.id);
+    if (!url || ![1, -1].includes(direction) || !choices(direction).includes(reason) ||
+        typeof note !== "string" || typeof card.text !== "string" || !Number.isFinite(savedAt)) return null;
+    const text = card.text.slice(0, 500);
+    return { id: card.id, url, text, direction, reason,
+      note: note.trim().slice(0, 400), features: features(text), words: words(text), savedAt };
+  }
+
+  function readVote(key, value) {
+    if (!value || !Number.isFinite(value.savedAt) || key !== keyPrefix + value.id) return null;
+    return vote(value, value.direction, value.reason, value.note, value.savedAt);
+  }
+
+  function readDraft(value, now = Date.now()) {
+    if (!value || !Number.isFinite(value.createdAt) || value.createdAt > now ||
+        now - value.createdAt > draftLifetime) return null;
+    return vote(value, value.direction, "example", "", value.createdAt);
   }
 
   function bucket(id) {
@@ -116,13 +141,18 @@
   }
 
   function votesFrom(records) {
-    return new Map(Object.entries(records).filter(([key, record]) => key.startsWith(keyPrefix) && record?.id)
-      .map(([, record]) => [record.id, record]));
+    const votes = new Map();
+    for (const [key, record] of Object.entries(records)) {
+      if (!key.startsWith(keyPrefix)) continue;
+      const validated = readVote(key, record);
+      if (validated) votes.set(validated.id, validated);
+    }
+    return votes;
   }
 
   function choices(direction) {
     return direction > 0 ? ["example", "practical", "evidence"] : ["example", "clickbait", "outrage", "engagement"];
   }
 
-  globalThis.FocusPolicy = { keyPrefix, reasons, features, safety, vote, decide, votesFrom, choices };
+  globalThis.FocusPolicy = { keyPrefix, pendingKey, canonicalUrl, readVote, readDraft, reasons, features, safety, vote, decide, votesFrom, choices };
 })();

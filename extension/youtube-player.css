@@ -1,4 +1,3 @@
-ytd-watch-flexy #movie_player.ad-showing > .html5-video-container { visibility: hidden !important; }
 #movie_player[data-focus-player-ad] > :not(.focus-player-ad-notice) {
   opacity: 0 !important;
 }

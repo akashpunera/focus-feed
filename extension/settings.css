@@ -13,3 +13,5 @@ article { border-top: 1px solid #84848466; padding: 8px 0; overflow-wrap: anywhe
 article strong { display: block; }
 summary { cursor: pointer; margin-top: 14px; }
 #status { margin: 0; }
+
+#pending { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #84848466; }

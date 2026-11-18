@@ -1,6 +1,6 @@
 # Focus Feed for Safari
 
-Focus Feed adds local 👍 and 👎 controls to the X and YouTube Home feeds. After you vote, choose a style, edit the reason, and select **Save preference**. The toolbar popup lets you edit or undo votes, review cards hidden by your preferences, and set how much room to leave for discovery.
+Focus Feed adds local 👍 and 👎 controls to the X and YouTube Home feeds. After you vote, open Focus Feed in the Safari toolbar, choose a style, edit the reason, and select **Save preference**. The toolbar popup lets you edit or undo votes, review cards hidden by your preferences, and set how much room to leave for discovery.
 
 ## Run the development build
 

@@ -13,7 +13,7 @@
         !!node.querySelector("ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-promoted-sparkles-web-renderer, ytd-display-ad-renderer, [class*='ad-badge']");
       const titleLink = node.querySelector("a#video-title-link, a#video-title, a.yt-lockup-metadata-view-model__title, h3 a[href^='/watch?v='], h3 a[href^='/shorts/']");
       const link = titleLink || node.querySelector("a[href^='/watch?v='], a[href^='/shorts/']");
-      const target = link ? new URL(link.href, location.origin) : null;
+      const target = link && URL.canParse(link.href, location.origin) ? new URL(link.href, location.origin) : null;
       const href = target?.origin === location.origin ? target : null;
       const id = href?.searchParams.get("v") || href?.pathname.match(/^\/shorts\/([^/]+)/)?.[1];
       const meta = node.querySelector("#video-title, .yt-lockup-metadata-view-model__title, h3");
@@ -22,6 +22,7 @@
       const image = [...node.querySelectorAll("img[alt]")].map(img => img.alt).join(" ");
       return {
         id: id ? "youtube:" + id : "", url: href?.href || "",
+        voteAnchor: titleLink?.closest("h3") || titleLink,
         text: [title, image].join(" ").trim(),
         sponsored: sponsored || [...node.querySelectorAll("badge-shape, .yt-badge-shape, ytd-badge-supported-renderer")]
           .some(badge => /^(?:sponsored|ad|paid promotion)$/i.test(badge.textContent.trim())),
@@ -36,7 +37,7 @@
       const article = node.matches("article") ? node : node.querySelector("article[data-testid='tweet']");
       const timestamp = article?.querySelector("time")?.closest("a[href*='/status/']");
       const link = timestamp || article?.querySelector("a[href^='/'][href*='/status/']");
-      const url = link?.href ? new URL(link.href) : null;
+      const url = link?.href && URL.canParse(link.href) ? new URL(link.href) : null;
       const id = url?.origin === location.origin ? url.pathname.match(/^\/[\w]+\/status\/(\d+)(?:\/|$)/)?.[1] : null;
       const text = [...node.querySelectorAll("[data-testid='tweetText'], [data-testid='card.wrapper'], img[alt]:not([data-testid='Tweet-User-Avatar'] img)")]
         .map(el => el.tagName === "IMG" ? el.alt : el.textContent).join(" ");
@@ -55,64 +56,24 @@
   let frame = 0;
   let currentUrl = "";
   const pending = new Set();
+  const voteBars = new WeakMap();
   let fullScan = true;
 
-  function button(label, action) {
-    const element = document.createElement("button");
-    element.type = "button";
-    if (action) element.textContent = label;
-    element.setAttribute("aria-label", label);
-    if (action) element.addEventListener("click", action);
-    return element;
-  }
-
-  function confirm(card, direction) {
-    document.getElementById("focus-feed-dialog")?.remove();
-    const dialog = document.createElement("dialog");
-    dialog.id = "focus-feed-dialog";
-    const form = document.createElement("form");
-    const title = document.createElement("h2");
-    title.textContent = direction > 0 ? "What would you like to see more of?" : "Why would you like to hide this?";
-    const select = document.createElement("select");
-    select.setAttribute("aria-label", "Preference");
-    const choices = policy.choices(direction);
-    const saved = votes.get(card.id);
-    const detected = policy.features(card.text).find(feature => choices.includes(feature));
-    for (const reason of choices) select.add(new Option(policy.reasons[reason], reason));
-    select.value = saved?.direction === direction ? saved.reason : detected || "example";
-    const note = document.createElement("textarea");
-    note.maxLength = 400;
-    note.placeholder = 'Add or edit your reason. Put an exact phrase in "quotes" to match it.';
-    note.setAttribute("aria-label", "Your reason");
-    note.value = saved?.direction === direction ? saved.note : "";
-    const status = document.createElement("p");
-    status.setAttribute("role", "status");
-    const submit = button("Save preference");
-    submit.type = "submit";
-    submit.textContent = "Save preference";
-    const cancel = button("Cancel", () => dialog.close());
-    form.append(title, select, note, status, submit, cancel);
-    dialog.append(form);
-    dialog.addEventListener("close", () => dialog.remove());
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      submit.disabled = true;
-      try {
-        const record = policy.vote(card, direction, select.value, note.value);
-        await api.storage.local.set({ [policy.keyPrefix + card.id]: record });
-        dialog.close();
-      } catch {
-        status.textContent = "Couldn’t save your preference. Try again.";
-        submit.disabled = false;
-      }
-    });
-    document.body.append(dialog);
-    dialog.showModal();
+  async function queueVote(card, direction, status) {
+    try {
+      await api.storage.local.set({ [policy.pendingKey]: {
+        id: card.id, text: card.text.slice(0, 500), direction, createdAt: Date.now()
+      } });
+      status.textContent = "Open Focus Feed in the toolbar to confirm.";
+    } catch {
+      status.textContent = "Couldn’t prepare the vote. Try again.";
+    }
   }
 
   function decorate(node) {
     const card = adapter.extract(node);
-    const existing = node.querySelector(":scope > .focus-feed-votes");
+    const existing = voteBars.get(node);
+    const anchor = card.voteAnchor?.closest("a") || card.voteAnchor;
     const result = policy.decide(card, votes, settings);
     const review = settings.review === true && result.kind === "preference";
     if (result.hide && !review) {
@@ -121,28 +82,41 @@
       return;
     }
     node.removeAttribute("data-focus-feed-hidden");
-    if (!card.id || !ready) { existing?.remove(); return; }
+    if (!policy.canonicalUrl(card.id) || !ready) { existing?.remove(); return; }
     const saved = votes.get(card.id);
-    const signature = JSON.stringify([card.id, card.text, saved?.direction, review && result.reason, result.liked]);
-    if (existing?.dataset.signature === signature) return;
+    const signature = JSON.stringify([card.id, card.text, saved?.direction, review, result.liked]);
+    const barInPlace = anchor ? anchor.nextElementSibling === existing : existing?.parentElement === node;
+    if (barInPlace && existing?.dataset.signature === signature) return;
     existing?.remove();
     const bar = document.createElement("div");
-    bar.className = "focus-feed-votes";
+    bar.className = youtube ? "focus-feed-votes focus-feed-votes--youtube" : "focus-feed-votes";
     bar.dataset.signature = signature;
     const label = document.createElement("span");
-    label.textContent = review ? "Hidden · " + result.reason : result.liked ? "Matches your preferences" : "Focus Feed";
+    label.textContent = review ? "Hidden by Focus Feed" : result.liked ? "Matches your preferences" : "Focus Feed";
+    label.hidden = youtube && !review && !result.liked;
     bar.append(label);
+    const status = document.createElement("small");
+    status.className = "focus-feed-vote-status";
+    status.setAttribute("role", "status");
     for (const [direction, label, icon] of [[1, "Show more like this", "👍"], [-1, "Hide this or show less like it", "👎"]]) {
-      const rate = button(label, event => {
+      const rate = document.createElement("button");
+      rate.type = "button";
+      rate.textContent = icon;
+      rate.setAttribute("aria-label", label);
+      rate.setAttribute("aria-pressed", String(saved?.direction === direction));
+      rate.addEventListener("click", event => {
+        if (!event.isTrusted) return;
         event.preventDefault();
         event.stopPropagation();
-        confirm(card, direction);
+        if (adapter.home() && node.isConnected && voteBars.get(node) === bar && adapter.extract(node).id === card.id)
+          queueVote(card, direction, status);
       });
-      rate.textContent = icon;
-      rate.setAttribute("aria-pressed", String(saved?.direction === direction));
       bar.append(rate);
     }
-    node.append(bar);
+    bar.append(status);
+    voteBars.set(node, bar);
+    if (anchor && anchor !== node && node.contains(anchor)) anchor.after(bar);
+    else node.append(bar);
   }
 
   function scan() {
@@ -164,12 +138,13 @@
   }
 
   function schedule() {
-    if (!frame) frame = requestAnimationFrame(scan);
+    // Safari may defer animation frames in an inactive browser window.
+    if (!frame) frame = setTimeout(scan, 16);
   }
 
   function collect(node) {
     const element = node.nodeType === 1 ? node : node.parentElement;
-    if (!element || element.closest(".focus-feed-votes, #focus-feed-dialog")) return;
+    if (!element || element.closest(".focus-feed-votes")) return;
     const match = element.closest(adapter.selector);
     if (match) pending.add(adapter.root(match));
     for (const child of element.querySelectorAll(adapter.selector)) pending.add(adapter.root(child));
@@ -181,7 +156,7 @@
       for (const record of records) {
         if (record.type === "childList") {
           const relevant = [...record.addedNodes, ...record.removedNodes].filter(node =>
-            node.nodeType !== 1 || !node.matches(".focus-feed-votes, #focus-feed-dialog"));
+            node.nodeType !== 1 || !node.matches(".focus-feed-votes"));
           if (!relevant.length) continue;
           const parent = record.target.nodeType === 1 ? record.target.closest(adapter.selector) : null;
           if (parent) pending.add(adapter.root(parent));
@@ -211,7 +186,8 @@
     for (const [key, change] of Object.entries(changes)) {
       if (key === "settings") settings = change.newValue || {};
       if (!key.startsWith(policy.keyPrefix)) continue;
-      if (change.newValue) votes.set(change.newValue.id, change.newValue);
+      const record = policy.readVote(key, change.newValue);
+      if (record) votes.set(record.id, record);
       else votes.delete(key.slice(policy.keyPrefix.length));
     }
     fullScan = true;

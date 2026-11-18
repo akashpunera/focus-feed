@@ -12,10 +12,15 @@
   let player = null;
   let frame = 0;
   let notice = null;
+  let coverTimer = 0;
+  let timedOut = false;
+  let watchId = "";
   const mutedByFilter = new Set();
   let skipAttempts = new WeakSet();
 
   function stopCoveringAd() {
+    clearTimeout(coverTimer);
+    coverTimer = 0;
     player?.removeAttribute("data-focus-player-ad");
     notice?.remove();
     notice = null;
@@ -27,9 +32,12 @@
   function update() {
     frame = 0;
     const current = location.pathname === "/watch" ? document.querySelector(playerSelector) : null;
-    if (current !== player) {
+    const currentId = new URLSearchParams(location.search).get("v") || "";
+    if (current !== player || currentId !== watchId) {
       stopCoveringAd();
       player = current;
+      watchId = currentId;
+      timedOut = false;
     }
     const showingAd = player && (player.classList.contains("ad-showing") ||
       player.classList.contains("ad-interrupting") ||
@@ -37,8 +45,10 @@
       [...player.querySelectorAll(skipSelector)].some(button => !button.disabled && visible(button)));
     if (!showingAd) {
       if (notice) stopCoveringAd();
+      timedOut = false;
       return;
     }
+    if (timedOut) return;
     player.setAttribute("data-focus-player-ad", "");
     for (const media of player.querySelectorAll("video")) {
       if (media.muted) continue;
@@ -51,6 +61,10 @@
       notice.setAttribute("role", "status");
       notice.textContent = "Focus Feed is hiding a playback ad.";
       player.append(notice);
+      coverTimer = setTimeout(() => {
+        timedOut = true;
+        stopCoveringAd();
+      }, 120_000);
     }
     for (const button of player.querySelectorAll(skipSelector)) {
       if (button.disabled || button.getAttribute("aria-disabled") === "true" || skipAttempts.has(button)) continue;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Focus Feed",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Teach Safari which X and YouTube Home posts you want to see.",
   "permissions": [
     "storage",

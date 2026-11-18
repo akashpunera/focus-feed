@@ -42,12 +42,6 @@ function fixture(t, url, markup, memory, script = "feed.js") {
   const dom = new JSDOM(markup, { ...windowOptions, url });
   const { window } = dom;
   window.browser = memory.api;
-  // jsdom provides the dialog element but does not implement opening or closing.
-  window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
-  window.HTMLDialogElement.prototype.close = function () {
-    this.open = false;
-    this.dispatchEvent(new window.Event("close"));
-  };
   const observers = [];
   const Observer = window.MutationObserver;
   window.MutationObserver = class extends Observer {
@@ -85,6 +79,16 @@ test("YouTube Home screens ads, explicit text and newly inserted cards", async t
   const doc = view.document;
   await until(() => doc.querySelector("#keep [aria-pressed]"), "Normal card receives voting controls");
   assert.equal(doc.querySelectorAll("[data-focus-feed-hidden]").length, 2);
+  const keep = doc.querySelector("#keep");
+  const controls = keep.querySelector("a").nextElementSibling;
+  assert.ok(controls.classList.contains("focus-feed-votes--youtube"));
+  assert.equal(controls.querySelectorAll("button").length, 2);
+  assert.ok(controls.querySelector("span").hidden);
+  keep.querySelector("a").replaceWith(keep.querySelector("a").cloneNode(true));
+  // Re-render the title and metadata ahead of the toolbar, as YouTube does on recycled cards.
+  keep.querySelector("a").after(doc.createElement("p"));
+  await until(() => keep.querySelector("a").nextElementSibling === keep.querySelector(".focus-feed-votes"), "Controls reattach to the new title");
+  assert.equal(keep.querySelectorAll(".focus-feed-votes").length, 1);
   doc.body.insertAdjacentHTML("beforeend", youtube("late", "How to fix a meter"));
   await until(() => doc.querySelector("#late button"), "New feed card is decorated");
   doc.querySelector("#late a").textContent = "Explicit sexual content";
@@ -114,32 +118,35 @@ test("Confirm, persist, edit, review and undo a vote across extension views", as
     youtube("adult", "Porn video");
   const view = fixture(t, "https://www.youtube.com/", markup, memory);
   const doc = view.document;
-  const dislike = () => doc.querySelector("#keep button:last-child");
+  const dislike = () => doc.querySelector("#keep button[aria-label='Hide this or show less like it']");
   await until(dislike, "Vote buttons render");
+  assert.ok(doc.querySelector("#keep h3 + .focus-feed-votes"));
   dislike().click();
-  assert.ok(doc.querySelector("dialog[open]"));
-  doc.querySelector("dialog button:last-child").click();
   assert.deepEqual(memory.records, {});
-  assert.equal(doc.querySelector("#keep[data-focus-feed-hidden]"), null);
-  dislike().click();
-  doc.querySelector("dialog textarea").value = "Skip sensational headlines";
-  doc.querySelector("dialog form").dispatchEvent(new view.Event("submit", { cancelable: true }));
+  assert.equal(doc.querySelector("dialog, textarea"), null);
+  await memory.api.storage.local.set({ pendingVote: { id: "youtube:keep", direction: -1,
+    text: "You won’t believe this new camera", createdAt: Date.now() } });
+  const popup = fixture(t, "https://extension.invalid/settings.html", src("settings.html"), memory, "settings.js").document;
+  await until(() => popup.querySelector("#pending textarea"), "Toolbar displays the draft");
+  popup.querySelector("#pending textarea").value = "Skip sensational headlines";
+  popup.querySelector("#pending button").click();
   await until(() => doc.querySelector("#keep[data-focus-feed-hidden]"), "Confirmed vote hides card");
   assert.equal(memory.records["vote:youtube:keep"].reason, "clickbait");
   assert.equal(memory.records["vote:youtube:keep"].text, "You won’t believe this new camera");
+  assert.equal(memory.records.pendingVote, undefined);
 
   const another = fixture(t, "https://www.youtube.com/", markup, memory).document;
   await until(() => another.querySelector("#keep[data-focus-feed-hidden]"), "New tab reads existing preference");
-  const settings = fixture(t, "https://extension.invalid/settings.html", src("settings.html"), memory, "settings.js").document;
-  await until(() => settings.querySelector("#saved")?.textContent.includes("Skip sensational headlines"), "Popup reads vote");
-  settings.querySelector("#saved button").click();
-  settings.querySelector("#saved textarea").value = "Skip clickbait";
-  settings.querySelector("#saved article > div > button").click();
+  await until(() => popup.querySelector("#saved")?.textContent.includes("Skip sensational headlines"), "Popup reads vote");
+  popup.querySelector("#saved button").click();
+  popup.querySelector("#saved textarea").value = "Skip clickbait";
+  popup.querySelector("#saved article > div > button").click();
   await until(() => memory.records["vote:youtube:keep"].note === "Skip clickbait", "Popup saves the edited reason");
-  settings.querySelector("#review").click();
-  await until(() => doc.querySelector("#keep .focus-feed-votes")?.textContent.includes("Skip clickbait"), "Review explains hidden card");
+  popup.querySelector("#review").click();
+  await until(() => doc.querySelector("#keep .focus-feed-votes")?.textContent.includes("Hidden by Focus Feed"), "Review explains hidden card");
   assert.ok(doc.querySelector("#adult[data-focus-feed-hidden]"));
-  [...settings.querySelectorAll("#saved button")].find(button => button.textContent === "Undo vote").click();
+  assert.ok(!doc.body.innerHTML.includes("Skip clickbait"));
+  [...popup.querySelectorAll("#saved button")].find(button => button.textContent === "Undo vote").click();
   await until(() => !memory.records["vote:youtube:keep"] && another.querySelector("#keep .focus-feed-votes span")?.textContent === "Focus Feed", "Undo updates feeds");
 });
 

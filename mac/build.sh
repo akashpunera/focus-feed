@@ -20,7 +20,7 @@ def write(bundle, identifier, executable, package, extra):
         "CFBundleDisplayName": "Focus Feed",
         "CFBundleInfoDictionaryVersion": "6.0",
         "CFBundlePackageType": package,
-        "CFBundleShortVersionString": "1.1.0",
+        "CFBundleShortVersionString": "1.2.0",
         "CFBundleVersion": "1",
         "LSMinimumSystemVersion": "13.0",
     }
